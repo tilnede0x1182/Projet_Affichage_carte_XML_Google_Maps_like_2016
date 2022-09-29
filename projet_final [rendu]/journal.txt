@@ -1,0 +1,73 @@
+Semaine du 25/01/16 :
+- Objectif : intervention de chaque membre sur le log , depot d'un fichier journal et commencer a se renseigner sur "libxml2" et "SDL".
+
+Semaine du 01/02 :
+- Tous les membres sont intervenus sur le log.
+- Prochain objectif: réussir à afficher un trait d'une couleur choisis avec sdl.
+
+Semaine du 08/02 :
+- On est parvenu à tracer une ligne dans une fenêtre sdl.
+- Prochain objectif: réussir à parser un xml (et maîtriser mieux la fenetre sdl).
+
+Semaine du 15/02 :
+- On est parvenu à tracer une ligne dans une fenêtre sdl avec SDL2 (erreur, avec SDL 1.2 la 1ere semaine).
+- Prochain objectif: réussir à parser un xml (et maîtriser mieux la fenetre sdl2).
+
+Semaine du 29/02 :
+- Parsage du XML avec la méthode DOM. Pas encore de lecture des attributs.
+- Prochain objectif: affiche les nodes d'un exemple de fihchier .osm
+	Jérémy : conversion de coordonnées terresttre vers des coordonnées SDL
+	Judes et Cyrille : tentative de lecture des attributs utils des nodes (lat, lon).
+
+Semaine du 07/03 :
+- Parsage du XML avec les méthodes DOM et SAX (affichage des attributs et choix des nodes et 
+des attributs à afficher) (Judes et Cyrille).
+- Traçage d'un point sur la SDL (annexe pour tracer un node séparé pour le moment).
+- Prochain objectif:
+	Cyrille et Jérémy : tracer les nodes d'un fichier XML dur la SDL en pouvant choisir l'épaisseur des points.
+		Jérémy : pofinement des méthodes de traçage SDL
+		Cyrille : Traduction des coordonnées terrestre en coordonnées cartésiennes.
+	Judes : creer les structures dont on a besoin pour faire le lien parser-sdl et peut commencer a coder le parser
+
+Semaine du 14/03 :
+- Judes : continuer le parser
+- Jérémy et Cyrille : traduire les coordonnée des nodes en pixels affichables sur la sdl
+- Prochain objectif:
+	Même chose.
+
+Semaine du 21/03 :
+- Judes : continuer le parser
+- Jérémy et Cyrille : traduire les coordonnées des nodes en pixels affichables sur la sdl -> premier résultat : 
+affichage des nodes sans conversion terrestre.
+- Prochain objectif:
+	- Judes : continuer le parser.
+	- Jérémy : trouver comment dessiner un polygone (-> se renseigner sur SDL gfx).
+	- Cyrille : traduire les coordonnées terrestres.
+
+Semaine du 28/03 :
+- Judes : parser seg. fault -> à finir au plus vite pour pouvoir commencer à dessiner.
+- Cyrille : La trdauction des coordonnées marche uniquement avec de petites cartes (exmeple 1, et 2 et 3 uniquement).
+Il faut rendre le code C fonctionnel (actuellement seule la version python marche).
+- Jérémy : trouver comment dessiner un polygone (-> se renseigner sur SDL gfx) -> Ok
+- Prochain objectif:
+	- Judes : Débugger le parser.
+	- Jérémy : aider pour les coordonnées et le parser.
+	- Cyrille : continuer la traduction et aider à debugger le parser.
+
+Semaine du 04/04 :
+- Jérémy, Judes : parser -> fin du débuggage
+- Cyrille : Même problème que la semaine dernière avec les coordonnées.
+- Prochain objectif:
+	- Judes : Améliorer le parser : recherche et insertion dichotomique.
+	- Jérémy : Dessiner les bâtiments, voix, etc avec des polygones
+	- Cyrille : Finir la traduction des coordonnées.
+
+Semaine du 11/04 :
+- Judes : parser : tests -> problème de lecture de la liste Node : la fin de la liste n'est pas détéctée.
+- Jérémy : affichage des points, mise à part le problème de relceture des listes.
+- Cyrille : Fin de la conversion des coordoonées.
+- Prochain objectif:
+	- Judes : Abandon de la dichotomie : mise en place des hashMap dans le parser.
+	- Cyrille, Jérémy : Dessiner les bâtiments, voix, etc avec des polygones
+
+

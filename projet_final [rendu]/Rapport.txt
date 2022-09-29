@@ -1,0 +1,7 @@
+﻿Nous avons traité la partie obligatoire, avec cependant un bug : 
+
+Nous n'avons pas réussit à stocker tous les tags, ce qui provoque l'absence de reonnaissance de certains objects (nous ne lisons actuellemt que le premier tag (la liste que nous avons tenté de mettre en place dans parser n'a pa pu être débuguée à temps (segmentation fault))).
+Les reste fonctionne corretement (affichage avec certaines parties manquantes).
+
+Toutes les cartes disponibles en exemple sur le cours CProj de didel  fonctionnent (avec les problèmes cités au-dessus).
+Les grandes cartes ne fonctionnenet pas (nous avons testé avec une carte de 20Mo)
