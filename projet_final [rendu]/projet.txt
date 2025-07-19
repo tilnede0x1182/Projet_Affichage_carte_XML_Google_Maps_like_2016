@@ -1,0 +1,1322 @@
+# Arborescence du projet (.)
+.
+├── projet_final [rendu]
+│   ├── fichiers_dexemple
+│   │   ├── 01_denver_lafayette.osm
+│   │   ├── 02_paris_place_des_vosges.osm
+│   │   ├── 03_paris_ile_saint_louis.osm
+│   │   ├── 04_niagara_falls.osm
+│   │   ├── 05_new_york_financial_district.osm
+│   │   ├── 07_quartier_paris_7.osm
+│   │   ├── 11_paris_place_de_la_nation.osm
+│   │   ├── 12_paris_pitie_salpetriere.osm
+│   │   ├── 13_paris_parc_montsouris.osm
+│   │   └── 6_fichier_volumineux_1.osm
+│   ├── journal.txt
+│   ├── Makefile
+│   ├── Rapport.txt
+│   ├── README.txt
+│   └── src
+│       ├── Affichage
+│       │   ├── Coordonnees
+│       │   │   ├── convert_coordonnees.c
+│       │   │   ├── convert_coordonnees.h
+│       │   │   └── Makefile
+│       │   ├── main.c
+│       │   └── util2.c
+│       ├── main.c
+│       ├── main.h
+│       ├── Makefile
+│       └── XML
+│           ├── main.c
+│           ├── Parser
+│           │   ├── liste.c
+│           │   ├── liste.h
+│           │   ├── Makefile
+│           │   ├── parser.c
+│           │   ├── struct.c
+│           │   └── struct.h
+│           └── util1.c
+├── projet.pdf
+└── projet.txt
+
+8 directories, 32 files
+
+
+# ./projet_final [rendu]/src/Affichage/Coordonnees/convert_coordonnees.c
+
+// Includes de base
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Includes des .h
+#include "../../XML/Parser/liste.h"
+#include "convert_coordonnees.h"
+
+// Variables préprocesseur
+#ifndef M_PI
+ #define M_PI 3.14159265358979323846
+#endif
+#ifndef RAYON_TERRE
+ #define RAYON_TERRE 6371.0 // km (approximatif)
+#endif
+
+double change_bornes (double borne_min, double borne_max, double valeur, 
+double nouvelle_borne_min, double nouvelle_borne_max) {
+	double val_res = ((valeur-borne_min)/(borne_max-borne_min))*nouvelle_borne_max;
+	if (val_res>nouvelle_borne_max)
+		val_res = nouvelle_borne_max;
+	if (val_res<nouvelle_borne_min)
+		val_res = nouvelle_borne_min;
+	return val_res;
+}
+
+double applatit_coordonnee (double valeur) {
+	double r = RAYON_TERRE;
+	double x = valeur;
+	double pi = M_PI;
+	double min_val = (90*pi*r)/180;
+	double res = (x*pi*r)/180;
+	res = change_bornes (0, min_val, res, 0, r);
+	return res;
+}
+
+double calc_coordonnee_positive (double xmin, double xmax, double x, double xmax_fenetre) {
+	double tmp = applatit_coordonnee(x);
+	double xmax_convert = applatit_coordonnee(xmax);
+	double xmin_convert = applatit_coordonnee(xmin);
+	return change_bornes (xmin_convert, xmax_convert, tmp, 0.0, xmax_fenetre);
+}
+
+coordonnes_t *calc_coordonnees (double xmin, double xmax, double ymin, 
+double ymax, double x, double y, double xmax_fenetre, double ymax_fenetre) {
+	coordonnes_t *res = malloc(sizeof(coordonnes_t));
+	if (!res) {
+		puts("Problème de mémoire : \nFonction : calc_coordonnees\nVariable : res\n");
+		return NULL;
+	}
+
+	if (xmin>=0 && xmax>=0)
+		res->x = calc_coordonnee_positive (xmin, xmax, x, xmax_fenetre);
+	if (ymin>=0 && ymax>=0)
+		res->y = calc_coordonnee_positive (ymin, ymax, y, ymax_fenetre);
+
+	if (xmin<=0 || xmax<=0) {
+		double xmax_res = xmax-xmin;
+		double x_res = x-xmin;
+		res->x = calc_coordonnee_positive (0, xmax_res, x_res, xmax_fenetre);
+	}
+	if (ymin<=0 || ymax<=0) {
+		double ymax_res = ymax-ymin;
+		double y_res = y-ymin;
+		res->y = calc_coordonnee_positive (0, ymax_res, y_res, ymax_fenetre);
+	}
+	return res;
+}
+
+void affiche_donness_pour_le_test (double xmax, double xmin, double ymax, double ymin, double y, double x, double xmax_fenetre, double ymax_fenetre) {
+	printf("\nxmin  = %lf\n", xmin);
+	printf("ymin  = %lf\n", ymin);
+	printf("xmax  = %lf\n", xmax);
+	printf("ymax  = %lf\n", ymax);
+	printf("x  = %lf\n", x);
+	printf("y  = %lf\n", y);
+	printf("xmax_fenetre  = %lf\n", xmax_fenetre);
+	printf("ymax_fenetre  = %lf\n\n", ymax_fenetre);
+}
+
+void convertit_liste (liste_t *lat, liste_t *lon, int taille_liste, double xmin, double xmax, double ymin, double ymax, double xmax_fenetre, double ymax_fenetre) {
+	liste_t *tmp_lat = lat;
+	liste_t *tmp_lon = lon;
+	int cmp = 0;
+	while (cmp<taille_liste && tmp_lat && tmp_lon) {
+		if (tmp_lat->elt && tmp_lon->elt) {
+			coordonnes_t *res = calc_coordonnees (xmin, xmax, ymin, ymax, tmp_lon->elt, tmp_lat->elt, xmax_fenetre, ymax_fenetre);
+			tmp_lon->elt = res->x;
+			tmp_lat->elt = res->y;
+		}
+		tmp_lat = tmp_lat->next;
+		tmp_lon = tmp_lon->next;
+		cmp++;
+	}
+}
+
+void test_avec_des_donnes () {
+	double xmax, xmin, ymax, ymin, y, x, xmax_fenetre, ymax_fenetre;
+	coordonnes_t *res;
+
+	/**
+		Rappel :
+			lat = y
+			lon = x
+	**/
+
+	xmax_fenetre = 800;
+	ymax_fenetre = 600;
+
+	// tests coordonnees positives
+	xmax = 15;
+	xmin = 12;
+	x = 13;
+	ymax = 15;
+	ymin = 12;
+	y = 15;
+
+	affiche_donness_pour_le_test (xmin, xmax, ymin, ymax, x, y, xmax_fenetre, ymax_fenetre);
+	res = calc_coordonnees (xmin, xmax, ymin, ymax, x, y, xmax_fenetre, ymax_fenetre);
+	printf("x = %lf\n", res->x);
+	printf("y = %lf\n", res->y);
+
+	// tests coordonnees négatives
+	xmax = -12;
+	xmin = -15;
+	x = -12;
+	ymax = -12;
+	ymin = -15;
+	y = -15;
+
+	free(res);
+	affiche_donness_pour_le_test (xmin, xmax, ymin, ymax, x, y, xmax_fenetre, ymax_fenetre);
+	res = calc_coordonnees (xmin, xmax, ymin, ymax, x, y, xmax_fenetre, ymax_fenetre);
+	printf("x = %lf\n", res->x);
+	printf("y = %lf\n", res->y);
+
+
+	// tests coordonnees positives et négatives
+	xmax = 5;
+	xmin = -5;
+	x = 5;
+	ymax = 5;
+	ymin = -5;
+	y = 5;
+
+	free(res);
+	affiche_donness_pour_le_test (xmin, xmax, ymin, ymax, x, y, xmax_fenetre, ymax_fenetre);
+	res = calc_coordonnees (xmin, xmax, ymin, ymax, x, y, xmax_fenetre, ymax_fenetre);
+	printf("x = %lf\n", res->x);
+	printf("y = %lf\n", res->y);
+
+	// tests avec vrai coordonnées :
+	xmax = -2.6436;
+	xmin = -3.4676;
+	x = -104.9739674;
+	ymax = 59.5183;
+	ymin = 58.9245;
+	y = 39.7519707;
+	
+	free(res);
+	affiche_donness_pour_le_test (xmin, xmax, ymin, ymax, x, y, xmax_fenetre, ymax_fenetre);
+	res = calc_coordonnees (xmin, xmax, ymin, ymax, x, y, xmax_fenetre, ymax_fenetre);
+	printf("x = %lf\n", res->x);
+	printf("y = %lf\n", res->y);
+}
+
+/*int main () {
+	test_avec_des_donnes();
+
+	return 0;
+}*/
+
+
+# ./projet_final [rendu]/src/Affichage/main.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL2_gfxPrimitives.h>
+#include <search.h>
+
+#include "Coordonnees/convert_coordonnees.h"
+#include "../XML/Parser/struct.h"
+#include "../main.h"
+
+#ifndef XWindows
+ #define XWindows 800.0
+#endif
+#ifndef YWindows
+ #define YWindows 600.0
+#endif
+
+void affiche_ligne (SDL_Renderer* renderer, int *tx, int *ty, int taille_tx_ty, color_rgb_t* color_rgb) {
+	int i = 0;
+	SDL_Point *points = malloc(taille_tx_ty*sizeof(SDL_Point));
+	if (!points) {
+		puts("Problèmes de mémoire :\nFonction : affiche_route\nVariable : point\n");
+		return;
+	}
+	while (i<taille_tx_ty) {
+		points[i].x = tx[i];
+		points[i].y = YWindows-ty[i];
+		i++;
+	}
+	SDL_SetRenderDrawColor(renderer, color_rgb->red, color_rgb->green, color_rgb->blue, 255);
+	SDL_RenderDrawLines(renderer, points, taille_tx_ty);
+	free(points);
+}
+
+void affiche_filled_polygone (SDL_Renderer* renderer, int *tx, int *ty, int taille_tx_ty, color_rgb_t* color_rgb) {
+	int i = 0;
+	short *stx = malloc(taille_tx_ty*sizeof(short));
+	short *sty = malloc(taille_tx_ty*sizeof(short));
+	if (!stx || !sty) {
+		puts("Problèmes de mémoire :\nFonction : affiche_polygone\nVariables strx et/ou sty\n");
+		return;
+	}
+	while (i<taille_tx_ty) {
+		stx[i] = tx[i];
+		sty[i] = YWindows-ty[i];
+		i++;
+	}
+	filledPolygonRGBA(renderer, stx, sty, taille_tx_ty, color_rgb->red, color_rgb->green, color_rgb->blue, 255);
+	free(stx);
+	free(sty);
+}
+
+void affiche_polygone (SDL_Renderer* renderer, int *tx, int *ty, int taille_tx_ty, color_rgb_t* color_rgb) {
+	int i = 0;
+	short *stx = malloc(taille_tx_ty*sizeof(short));
+	short *sty = malloc(taille_tx_ty*sizeof(short));
+	if (!stx || !sty) {
+		puts("Problèmes de mémoire :\nFonction : affiche_polygone\nVariables strx et/ou sty\n");
+		return;
+	}
+	while (i<taille_tx_ty) {
+		stx[i] = tx[i];
+		sty[i] = YWindows-ty[i];
+		i++;
+	}
+	polygonRGBA(renderer, stx, sty, taille_tx_ty, color_rgb->red, color_rgb->green, color_rgb->blue, 255);
+	free(stx);
+	free(sty);
+}
+
+color_rgb_t *utilise_tag (Way way) {
+	color_rgb_t *color_rgb = malloc(sizeof(color_rgb_t));
+	if (!color_rgb) {
+		puts("Problèmes de mémoire :\nFonction : utilise_tag\nVariable : color_rgb\n");
+		return NULL;
+	}
+
+	char **tag = way.tag;
+	remplit_color_rgb_t(color_rgb, 0, 0, 0, "ligne");
+	if (tag[0] && tag[1]) {
+		if(strcmp(tag[0], "building") == 0 && strcmp(tag[1], "yes") == 0)
+			remplit_color_rgb_t(color_rgb, 68, 41, 0, "filledpolygone");
+		if(strcmp(tag[0], "highway") == 0)
+			remplit_color_rgb_t(color_rgb, 95, 95, 95, "ligne");
+		if(strcmp(tag[0], "waterway") == 0 && strcmp(tag[1], "river") == 0)
+			remplit_color_rgb_t(color_rgb, 0, 0, 155, "filledpolygone");
+		if(strcmp(tag[0], "waterway") == 0 && strcmp(tag[1], "canal") == 0)
+			remplit_color_rgb_t(color_rgb, 102, 178, 255, "filledpolygone");
+		if(strcmp(tag[0], "natural") == 0 && strcmp(tag[1], "water") == 0)
+			remplit_color_rgb_t(color_rgb, 0, 102, 255, "filledpolygone");
+		if(strcmp(tag[0], "natural") == 0 && strcmp(tag[1], "coastline") == 0)
+			remplit_color_rgb_t(color_rgb, 58, 144, 230, "ligne");
+		if(strcmp(tag[0], "landuse") == 0)
+			remplit_color_rgb_t(color_rgb, 240, 166, 92, "filledpolygone");
+	}
+	else {
+		if (!tag[0]) {
+			//puts("tag[0] est null");
+		}
+		if (!tag[1]) {
+			//puts("tag[1] est null");
+		}
+	}
+	return color_rgb;
+}
+
+/**
+	Rappel : 
+		lon = x
+		lat = y
+**/
+int affichage (int taille_tab_dessin) {
+	if (taille_tab_dessin==-1) {
+		puts("Erreur : fermeture de l'application");
+		return 0;
+	}
+	SDL_Window* window;
+	SDL_Renderer* renderer;
+	// déclaration d'une surface.
+	if(SDL_Init(SDL_INIT_VIDEO) < 0)
+		return 1;
+
+	window = SDL_CreateWindow("Tracer un Point", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, XWindows, YWindows, 0);
+	// création de la fenêtre
+	renderer = SDL_CreateRenderer(window, -1, 0);
+	// création de l'outil de dessin
+	//SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	// choix d'une couleur
+	SDL_RenderClear(renderer);
+	// nétoyage de la fenêtre
+
+	// affichages des polygones
+	affiche_ways_fin(renderer, taille_tab_dessin);
+
+	// mécanisme de fonctinnement de la fenêtre
+	SDL_RenderPresent(renderer);
+	SDL_Event e;
+	while (1) {
+		if (SDL_PollEvent(&e)) {
+			if (e.type == SDL_QUIT) {
+				break;
+			}
+		}
+	}
+	SDL_Quit();
+	return 1;
+}
+
+
+# ./projet_final [rendu]/src/Affichage/util2.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL2_gfxPrimitives.h>
+#include <search.h>
+
+#include "Coordonnees/convert_coordonnees.h"
+#include "../XML/Parser/struct.h"
+#include "../main.h"
+
+void remplit_tab_dessin_t (tab_dessin_t *tab_dessin, int *tx, int *ty, int taille_tx_ty, color_rgb_t *color_rgb) {
+	tab_dessin->tx = tx;
+	tab_dessin->ty = ty;
+	tab_dessin->taille_tx_ty = taille_tx_ty;
+	tab_dessin->color_rgb = color_rgb;
+}
+
+void remplit_color_rgb_t (color_rgb_t *color_rgb, int red, int green, int blue, char *forme) {
+	color_rgb->red = red;
+	color_rgb->green = green;
+	color_rgb->blue = blue;
+	color_rgb->forme = forme;
+}
+
+
+
+
+# ./projet_final [rendu]/src/main.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL2_gfxPrimitives.h>
+#include <search.h>
+
+#include "Affichage/Coordonnees/convert_coordonnees.h"
+#include "XML/Parser/struct.h"
+#include "main.h"
+
+#ifndef XWindows
+ #define XWindows 800.0
+#endif
+#ifndef YWindows
+ #define YWindows 600.0
+#endif
+
+int main (int argc, char **argv) {
+	if (argc<2) {
+		puts("usage : prgm fichier.osm");
+		return 3;
+	}
+	affichage(lecture_du_XML(argv[1]));
+	return 0;
+}
+
+
+# ./projet_final [rendu]/src/XML/main.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL2_gfxPrimitives.h>
+#include <search.h>
+
+#include "../Affichage/Coordonnees/convert_coordonnees.h"
+#include "../XML/Parser/struct.h"
+#include "../main.h"
+
+#ifndef XWindows
+ #define XWindows 800.0
+#endif
+#ifndef YWindows
+ #define YWindows 600.0
+#endif
+
+tab_dessin_t *utilise_refs_fin (int *tx, int *ty, int taille_tx_ty, Way way) {
+	tab_dessin_t *tab_dessin = malloc(sizeof(tab_dessin_t));
+	if (!tab_dessin) {
+		puts("Problèmes de mémoire :\nFonction : utilise_refs\nVariable : tab_dessin\n");
+		free(tx);
+		free(ty);
+		return NULL;
+	}
+	color_rgb_t *color_rgb = utilise_tag(way);
+	if (!color_rgb) {
+		puts("Problèmes de mémoire :\nFonction : utilise_way\nVariable : color_rgb\n");
+		free(tx);
+		free(ty);
+		free(tab_dessin);
+		return NULL;
+	}
+	remplit_tab_dessin_t(tab_dessin, tx, ty, taille_tx_ty, color_rgb);
+	return tab_dessin;
+}
+
+void utilise_refs (Way way, ListNode *list_node, coordonnees_affichage_t *coordonnees_affichage, int nbr_node) {
+	int i=0, cmp = 0, taille_tx_ty = 0;
+	int *tx = malloc(nbr_node*sizeof(int));
+	int *ty = malloc(nbr_node*sizeof(int));
+	coordonnes_t *res;
+	Node *node = NULL;
+	List* refs = (&way)->refs;
+	if (!tx || !ty) {
+		puts("Problèmes de mémoire :\nFonction : utilise_refs\nVariables tx et/ou ty\n");
+		return;
+	}
+	while (refs) {
+		refs = refs->next; cmp++;
+	}
+	refs = (&way)->refs;
+	while (i<cmp-1) {
+		refs = refs->next;
+		node = cherche_node_ref(refs->data);
+		if (node) {
+			res = calc_coordonnees(coordonnees_affichage->xmin, 
+			coordonnees_affichage->xmax, coordonnees_affichage->ymin, 
+			coordonnees_affichage->ymax, node->lon, node->lat, XWindows, YWindows);
+			if (!res) {
+				puts("Problèmes de mémoire :\nFonction : utilise_refs\nVariables res (calc_cordonnées)\n");
+				return;
+			}
+			tx[i] = (int)(res->x); ty[i] = (int)(res->y);
+			free(res);
+			taille_tx_ty++;
+		}
+		i++;
+	}
+	tab_affichage[compteur_tab_affichage] = utilise_refs_fin (tx, ty, taille_tx_ty, way);
+	compteur_tab_affichage++;
+}
+
+int affiche_ways_debut (XML* xml, coordonnees_affichage_t *coordonnees_affichage) {
+	int i=0, cmp=0;
+	ListWay *list_way = xml->lw;
+	while (list_way) {
+		list_way = list_way->suivant;
+		cmp++;
+	}
+	Way way;
+	list_way = xml->lw;
+	tab_affichage = malloc(cmp*sizeof(tab_dessin_t*));
+	if (!tab_affichage) {
+		puts("Problèmes de mémoire :\nFonction : \nVariable : tab_affichage\n");
+		return 0;
+	}
+	compteur_tab_affichage = 0;
+	printf("Nombre de ways : %d\n", cmp);
+	while (i<cmp) {
+		way = list_way->element;
+		utilise_refs(way, xml->ln, coordonnees_affichage, xml->ListNode_len);
+		//printf("i = %d\n", i);
+		list_way = list_way->suivant;
+		i++;
+	}
+	return cmp;
+}
+
+void affiche_ways_fin (SDL_Renderer* renderer, int taille_tab_dessin) {
+	if (!tab_affichage) {
+		puts("Problèmes de mémoire :\nFonction : affiche_ways_fin\nVariable : tab_affichage\n");
+		return;
+	}
+	int i=0;
+	tab_dessin_t *tab_dessin_tmp;
+	while (i<taille_tab_dessin-1) {
+		tab_dessin_tmp = tab_affichage[i];
+		if (strcmp(tab_dessin_tmp->color_rgb->forme, "filledpolygone")==0)
+			affiche_filled_polygone(renderer, tab_dessin_tmp->tx, tab_dessin_tmp->ty, tab_dessin_tmp->taille_tx_ty, tab_dessin_tmp->color_rgb);
+		else if (strcmp(tab_dessin_tmp->color_rgb->forme, "polygone")==0)
+			affiche_polygone(renderer, tab_dessin_tmp->tx, tab_dessin_tmp->ty, tab_dessin_tmp->taille_tx_ty, tab_dessin_tmp->color_rgb);
+		else
+			affiche_ligne(renderer, tab_dessin_tmp->tx, tab_dessin_tmp->ty, tab_dessin_tmp->taille_tx_ty, tab_dessin_tmp->color_rgb);
+		i++;
+	}
+	free(tab_affichage);
+}
+
+int lecture_du_XML (char *fichier_osm) {
+	XML* xml = Parser(fichier_osm);
+	if (!xml) {
+		puts("Problèmes de mémoire : \nFonction : affichage\nvariable : xml");
+		return -1;
+	}
+	//remlissage du hashtab avec les nodes
+	remlissage_hash_tab(xml->ln);
+	// acquisition des coordoonées
+	coordonnees_affichage_t *coordonnees_affichage = remplissage_des_coordoonnes_extremes(xml);
+	if (!coordonnees_affichage) {
+		puts("Problèmes de mémoire :\nFonction : lecture_du_XML\nVariable : coordonnees_affichage\n");
+		return -1;
+	}
+	int taille_tab_dessin = affiche_ways_debut(xml, coordonnees_affichage);
+	free(coordonnees_affichage);
+	return taille_tab_dessin;
+}
+
+
+# ./projet_final [rendu]/src/XML/Parser/liste.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "liste.h"
+
+/**
+	Renvoie la longueur de la liste.
+**/
+int len (liste_t *liste) {
+	if (!liste) return 0;
+	int cmp = 0;
+	liste_t *tmp = liste;
+	while (tmp) {
+		tmp = tmp->next;
+		if (&tmp->elt) cmp++;
+	}
+	return cmp;
+}
+
+int est_vide (liste_t *liste) {
+	if (!liste) return 1;
+	if (len(liste)<=0) return 1;
+	return 0;
+}
+
+liste_t *init_liste_t (liste_t *liste, double elt) {
+	liste = malloc(sizeof(liste_t));
+	if (!liste) {
+		puts("Problème des mémoire : impossible d'allouer une liste de type liste_t.");
+		return NULL;
+	}
+	liste->elt = elt;
+	return liste;
+}
+
+liste_t *create_liste_t (liste_t *liste) {
+	liste = malloc(sizeof(liste_t));
+	if (!liste) {
+		puts("Problème des mémoire : impossible d'allouer une liste de type liste_t.");
+		return NULL;
+	}
+	return liste;
+}
+
+int ajoute_element (liste_t *liste, double elt) {
+	puts("ajoute_element");
+	if (!liste) {
+		puts("fonction ajoute_element : la liste n'est pas définie.");
+		return 0;
+	}
+	liste_t *tmp = liste;
+	int i = 0;
+	//printf("taille de la liste : ", len(liste));
+	while (tmp->next) {
+		puts("ok");
+		tmp = tmp->next;
+		printf("parcours de la liste : %d\n", i);
+		i++;
+	}
+	tmp->next = create_liste_t(tmp->next);
+	if (!tmp->next)
+		return 0;
+	tmp = tmp->next;
+	tmp->elt = elt;
+	return 1;
+}
+
+/**
+	Ajoute un élémet à la fin de la liste.
+	(prend la taille en argument pour être sûr de ne pas déborder)
+**/
+int ajoute_element_taille_liste (liste_t *liste, double elt, int taille_liste) {
+	puts("ajoute_element");
+	if (!liste) {
+		puts("fonction ajoute_element : la liste n'est pas définie.");
+		return 0;
+	}
+	liste_t *tmp = liste;
+	int cmp = 0;
+	//printf("taille de la liste : ", len(liste));
+	while (cmp<taille_liste && tmp->next) {
+		//puts("ok");
+		tmp = tmp->next;
+		//printf("parcours de la liste : %d\n", i);
+		cmp++;
+	}
+	tmp->next = create_liste_t(tmp->next);
+	if (!tmp->next)
+		return 0;
+	tmp = tmp->next;
+	tmp->elt = elt;
+	return 1;
+}
+
+/**
+	Affiche tous les éléments de la liste.
+**/
+void affiche_liste (liste_t *liste) {
+	if (!liste) {
+		puts("fonction affiche_liste : la liste n'est pas définie.");
+		return;
+	}
+	int cmp = 0;
+	liste_t *tmp = liste;
+	while (tmp) {
+		if (&tmp->elt&&cmp>0) {
+			printf("liste[%d] = %lf\n", cmp, tmp->elt);
+		}
+		tmp = tmp->next;
+		cmp++;
+	}
+}
+
+/**
+	Affiche tous les éléments de la liste.
+**/
+void affiche_liste_avec_nom (liste_t *liste, char *nom_liste) {
+	if (!liste) {
+		puts("fonction affiche_liste : la liste n'est pas définie.");
+		return;
+	}
+	int cmp = 0;
+	liste_t *tmp = liste;
+	while (tmp) {
+		if (&tmp->elt&&cmp>0) {
+			printf("%s[%d] = %lf\n", nom_liste, cmp, tmp->elt);
+		}
+		tmp = tmp->next;
+		cmp++;
+	}
+}
+
+void tests () {
+	liste_t *liste = NULL;
+	liste = create_liste_t (liste);
+	printf("ajoute_element : %d\n", ajoute_element(liste, 2));
+	printf("ajoute_element : %d\n", ajoute_element(liste, 2));
+	printf("len_liste = %d\n", len(liste));
+	affiche_liste(liste);
+}
+
+void tests_parcours_prefixe () {
+	// Initialisation des listes lat et lon.
+	liste_t *lat = NULL;
+	liste_t *lon = NULL;
+	lat = create_liste_t (lat);
+	lon = create_liste_t (lon);
+
+	if (!lat || !lon) EXIT_FAILURE; //le message d'erreur est dans la fonction create_liste_t
+	int i;
+	for (i=0; i<100; i++) {
+		printf("ajoute_element : %d\n", ajoute_element(lat, 2));
+	}
+
+	printf("len_liste = %d\n", len(lat));
+	affiche_liste(lat);
+}
+
+int main1 () {
+	//tests();
+	tests_parcours_prefixe();
+	return 0;
+}
+
+
+# ./projet_final [rendu]/src/XML/Parser/parser.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <libxml/tree.h>
+#include <libxml/parser.h>
+#include <libxml/parserInternals.h>
+#include <search.h>
+
+#include "struct.h"
+
+int way = 0;
+ListNode * ln = NULL;
+int ListNode_len=0;
+ListWay * lw = NULL;
+List *refs ;
+char *tag[2];
+Bounds *bd = NULL;
+
+char *cherche_attribut(const xmlChar **attrs, char *nom_attribut) {
+	int cmp = 0;
+	while (attrs[cmp]) {
+		cmp++;
+	}
+	int i = 0;
+	while (i<cmp-1) {
+		if (strcmp((const char*)(attrs[i]), nom_attribut)==0)
+			return (char*)(attrs[i+1]);
+		i++;
+	}
+	return NULL;	
+}
+
+
+void init_min_max(const xmlChar **attrs){
+      if (attrs != NULL) {
+        bd = malloc(sizeof(Bounds));
+	if (!bd) {
+		puts("Problèmes de mémoire : \nFonction : init_min_max\nvariable : bounds");
+		return;
+	}
+
+        bd->minlat=atof(cherche_attribut(attrs, "minlat"));
+        bd->minlon=atof(cherche_attribut(attrs, "minlon"));
+        bd->maxlat=atof(cherche_attribut(attrs, "maxlat"));
+        bd->maxlon=atof(cherche_attribut(attrs, "maxlon"));
+      }
+}
+
+void debut_document(void *user_data) {
+    //printf("Début du document\n");
+}
+
+
+void fin_document(void *user_data) {
+    //printf("Fin du document\n");
+}
+
+void debut_element(void *user_data, const xmlChar *name, const xmlChar **attrs) {
+    //printf("Début de l'élément : %s\n", name);
+
+    if(xmlStrEqual(name, BAD_CAST "bounds")){
+      init_min_max(attrs);
+    }
+    else if(xmlStrEqual(name, BAD_CAST "node")){
+        if(ln==NULL){
+            //printf("create\n");
+            Node nd;
+            nd.id = malloc((strlen((char*)attrs[1]) + 1) * sizeof(char));
+	    if (!nd.id) {
+		puts("Problèmes de mémoire : \nFonction : debut_element\nvariable : nd.id");
+		return;
+	    }
+            strcpy(nd.id,(char*)attrs[1]);
+            nd.lat = atof(cherche_attribut(attrs, "lat"));
+            nd.lon = atof(cherche_attribut(attrs, "lon"));
+            ln = list_node_create(nd);
+            ListNode_len++;
+        }
+        else{
+           //printf("ajoute\n");
+           Node nd;
+           nd.id = malloc((strlen((char*)attrs[1]) + 1) * sizeof(char));
+	   if (!nd.id) {
+		puts("Problèmes de mémoire : \nFonction : debut_element\nvariable : nd.id");
+		return;
+	   }
+           strcpy(nd.id,(char *)attrs[1]);
+           nd.lat = atof(cherche_attribut(attrs, "lat"));
+           nd.lon = atof(cherche_attribut(attrs, "lon"));
+           node_append(ln,nd);
+           ListNode_len++;
+        }
+	}
+    	else if(xmlStrEqual(name,BAD_CAST "way")){
+        way++;
+
+	}
+	else if(xmlStrEqual(name,BAD_CAST "nd") && way){
+        if(refs==NULL){
+            //printf("creeWay\n");
+            char* str = malloc((strlen((char*)attrs[1]) + 1) * sizeof(char));
+	   if (!str) {
+		puts("Problèmes de mémoire : \nFonction : debut_element\nvariable : str");
+		return;
+	   }
+            strcpy(str,(char *)attrs[1]);
+            refs=list_create(str);
+        }
+        else{
+           //printf("ajouteWay\n");
+           char* str = malloc((strlen((char*)attrs[1]) + 1) * sizeof(char));
+	   if (!str) {
+		puts("Problèmes de mémoire : \nFonction : debut_element\nvariable : str");
+		return;
+	   }
+           strcpy(str,(char *)attrs[1]);
+           list_append(refs,str);
+        }
+	}
+
+	else if(xmlStrEqual(name,BAD_CAST "tag") && way){
+        //printf("tag\n");
+        if (!tag[0]){
+            //printf("debut_element:attrs: %s, %s \n",attrs[1],attrs[3]);
+            tag[0] = malloc((strlen((char*)(cherche_attribut(attrs, "k"))) + 1) * sizeof(char));
+            tag[1] = malloc((strlen((char*)(cherche_attribut(attrs, "v"))) + 1) * sizeof(char));
+	    if (!tag[0] || !tag[1]) {
+		puts("Problèmes de mémoire : \nFonction : debut_element\nvariables tag[0] ou tag[1]");
+		return;
+	    }
+            strcpy(tag[0], cherche_attribut(attrs, "k"));
+            strcpy(tag[1], cherche_attribut(attrs, "v"));
+        }
+        //printf("tag2\n");
+	}
+}
+
+
+void fin_element(void *user_data, const xmlChar *name) {
+    //printf("Fin de l'élément : %s\n", name);
+    if(xmlStrEqual(name,BAD_CAST "way")){
+        //printf("finduway\n");
+        Way tmp_way;
+        tmp_way.refs = list_create(refs->data);
+        while (refs!=NULL){
+            refs = refs->next;
+            if(refs){
+                list_append(tmp_way.refs,refs->data);
+            }
+        }
+       // printf("fin_element:attrs: %s, %s\n",tag[0],tag[1]);
+
+        tmp_way.tag[0] = tag[0];
+        tmp_way.tag[1] = tag[1];
+
+        if(lw==NULL){
+            //printf("create2\n");
+            lw=list_way_create(tmp_way);
+        }
+        else{
+            //printf("append2\n");
+            way_append(lw,tmp_way);
+        }
+        refs = NULL;
+        tag[0] = NULL;
+        tag[1] = NULL;
+        way--;
+    }
+    //printf("fin2\n");
+}
+
+void caracteres(void *user_data, const xmlChar *ch, int len) {
+    //printf("Elément texte : (longueur = %d) %.*s\n", len, len, ch);
+}
+
+XML* Parser(char* file){
+    // Initialisation de tous les membres à zéro (soit NULL pour un pointeur par conversion)
+    xmlSAXHandler sax = { 0 };
+    // Utilisation par affectation de la fonction au membre startDocument
+    sax.startDocument = debut_document;
+    // Utilisation par affectation de la fonction au membre endDocument
+    sax.endDocument = fin_document;
+    // Affectation de la fonction au membre startElement
+    sax.startElement = debut_element;
+    // Affectation de la fonction au membre endElement
+    sax.endElement = fin_element;
+    // Affectation de la fonction au membre characters
+    sax.characters = caracteres;
+
+    xmlParserCtxtPtr ctxt;
+    // Création du contexte
+    if ((ctxt = xmlCreateFileParserCtxt(file)) == NULL) {
+        fprintf(stderr, "Erreur lors de la création du contexte\n");
+	return NULL;
+    }
+    // Fonctions de rappel à utiliser
+    ctxt->sax = &sax;
+    // Analyse
+    xmlParseDocument(ctxt);
+    // Le document est-il bien formé ?
+    if (ctxt->wellFormed) {
+        //printf("Document XML bien formé\n");
+    }
+    else {
+        fprintf(stderr, "Document XML mal formé\n");
+        xmlFreeParserCtxt(ctxt);
+    }
+
+    // Libération de la mémoire
+    // rien pour le moment.
+
+    XML* xml = malloc(sizeof(XML));
+    if (!xml) {
+	puts("Problèmes de mémoire : \nFonction : Parser\nvariable : xml");
+	return NULL;
+    }
+    xml->ln = ln;
+    xml->lw = lw;
+    xml->bd = bd;
+    xml->ListNode_len = ListNode_len;
+
+    printf("Nombre de Nodes : %d\n", ListNode_len);
+    //printf("Nombre de ways oubliés : %d\n", way);
+    puts("fin parssage");
+
+    return xml;
+}
+
+/*int main() {
+    XML* xml = Parser("02_paris_place_des_vosges.osm");
+    //code a mettre ds le sdl pour creer le hashmap
+    hcreate((xml->ListNode_len + ((xml->ListNode_len*25)/100)));
+    ListNode **plist = &(xml->ln);
+    //int i;
+    //for(i=0;i<(xml->ListNode_len);i++){
+    while (*plist){
+        char *key1 = ((*plist)->element).id;
+      //strcpy(key1, "abc");
+      coord *c1 = malloc(sizeof(coord));
+      if (!c1) {
+		puts("Problèmes de mémoire : \nFonction : main\nvariable : c1");
+		return 1;
+      }
+      XML* xml = malloc(sizeof(XML));
+      if (!xml) {
+		puts("Problèmes de mémoire : \nFonction : main\nvariable : xml");
+		return 1;
+      }
+      c1 -> lat = ((*plist)->element).lat;
+      c1 -> lon = ((*plist)->element).lon;
+
+      ENTRY e = {key1, c1};
+
+      hsearch(e, ENTER);
+      plist = &((*plist)->suivant);
+    }
+    //}
+    //fin de la creation du hashmap
+
+    //comment afficher un element du hashmap
+    ENTRY e_find = {};
+    ENTRY *e_res;
+    e_find.key = "1381772707";
+    e_res = hsearch(e_find, FIND);
+    coord *c_res = (coord *) (e_res -> data);
+    //printf(" %lf, %lf\n", c_res -> lat, c_res -> lon);
+
+    //recuperer string des element de la list de ref
+    ListWay **pliste = &(xml->lw);
+    char * str = (((*pliste)->element).refs)->data;
+    //printf("refs1 %s\n",str);
+    // Libération de la mémoire
+    //xmlFreeParserCtxt(ctxt);
+
+    return EXIT_SUCCESS;
+}*/
+
+
+
+# ./projet_final [rendu]/src/XML/Parser/struct.c
+
+#include "struct.h"
+
+List *list_create (char* data){
+   List *list = malloc(sizeof(List)); /* allocation et affectation à la variable list */
+   if (list) {                         /* si l'allocation a réussi */
+       list->data = data;              /* affectation du champ data  */
+       list->next = NULL;              /* affectation du champ next à la liste vide */
+   }
+   else {
+	puts("Problèmes de mémoire : \nFonction : list_create\nvariable : list");
+   }
+   return list;                        /* retour de la liste (correctement allouée et affectée ou NULL) */
+ }
+
+List *list_append(List *list, char* data){
+    List **plist = &list;
+    while (*plist){
+       plist = &(*plist)->next;
+    }
+    *plist = list_create(data);
+    if (*plist)
+       return list;
+    else {
+        return NULL;
+    }
+}
+
+/* struct de liste specifique inutile*/
+
+ListNode *list_node_create (Node nd){
+	ListNode *list = malloc(sizeof(ListNode)); /* allocation  et affectation à la variable list */
+   	if (list) {                         /* si l'allocation a réussi */
+         	list->element = nd;              /* affectation du champ data */
+       	        list->suivant = NULL;              /* affectation du champ next à la liste vide */
+   	}
+   else {
+	puts("Problèmes de mémoire : \nFonction : list_node_create\nvariable : list");
+   }
+   return list;                        /* retour de la liste (correctement allouée et affectée ou NULL) */
+}
+
+ListNode* node_append(ListNode *list, Node element){
+    ListNode **plist = &list;
+    while (*plist!=NULL){
+        plist = &((*plist)->suivant);
+        }
+    *plist = list_node_create(element);
+     if (*plist)
+        return list;
+    else
+        return NULL;
+}
+
+
+ListWay *list_way_create (Way w){
+    ListWay *list = malloc(sizeof(ListWay)); /* allocation (en vert sur le diagramme) et affectation à la variable list (en bleu) */
+    if (list) {                           /* si l'allocation a réussi */
+     list->element = w;              /* affectation du champ data */
+     list->suivant = NULL;              /* affectation du champ next à la liste vide */
+    }
+   else {
+	puts("Problèmes de mémoire : \nFonction : list_way_create\nvariable : list");
+   }
+    return list;                        /* retour de la liste (correctement allouée et affectée ou NULL) */
+}
+
+ListWay* way_append(ListWay *list, Way element){
+    ListWay **plist = &list;
+    while (*plist!=NULL)
+        plist = &(*plist)->suivant;
+    *plist = list_way_create(element);
+     if (*plist)
+        return list;
+    else
+        return NULL;
+}
+
+
+
+# ./projet_final [rendu]/src/XML/util1.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL2_gfxPrimitives.h>
+#include <search.h>
+
+#include "../Affichage/Coordonnees/convert_coordonnees.h"
+#include "Parser/struct.h"
+#include "../main.h"
+
+void remlissage_hash_tab (ListNode *list_node) {
+	ListNode *tmp = list_node;
+	int cmp = 0;
+	while (tmp) {
+		tmp = tmp->suivant;
+		cmp++;
+	}
+	hcreate(cmp);
+	ENTRY entry = {};
+	int i=0;
+	tmp = list_node;
+	while (i<cmp) {
+		entry.key = tmp->element.id;
+		entry.data = &(tmp->element);
+		hsearch(entry, ENTER);
+		tmp = tmp->suivant;
+		i++;
+	}
+}
+
+coordonnees_affichage_t *remplissage_des_coordoonnes_extremes (XML* xml) {
+	coordonnees_affichage_t *coordonnees_affichage = malloc(sizeof(coordonnees_affichage_t));
+	if (!coordonnees_affichage) {
+		puts("Problèmes de mémoire : \nFonction : remplissage_des_coordoonnes_extremes\nvariable : coordonnees_affichage");
+		return NULL;
+	}
+	coordonnees_affichage->xmin = (xml->bd)->minlon;
+	coordonnees_affichage->xmax = (xml->bd)->maxlon;
+	coordonnees_affichage->ymin = (xml->bd)->minlat;
+	coordonnees_affichage->ymax = (xml->bd)->maxlat;
+	return coordonnees_affichage;
+}
+
+Node *cherche_node_ref (char * ref) {
+	ENTRY entry_find = {};
+	ENTRY *entry_res;
+	entry_find.key = ref;
+	entry_res = hsearch(entry_find, FIND);
+	if (!entry_res) {
+		puts("Problème de mémoire : \nFonction : cherche_node_ref\nVariable : entry_res\n");
+		return NULL;
+	}
+	return entry_res->data;
+}
+
+
+# ./projet_final [rendu]/src/Affichage/Coordonnees/convert_coordonnees.h
+
+#ifndef CONVERT_COORDONNEES_H
+# define CONVERT_COORDONNEES_H
+
+typedef struct coordonnes_s {
+	double x;
+	double y;
+} coordonnes_t;
+
+double change_bornes (double borne_min, double borne_max, double valeur, 
+double nouvelle_borne_min, double nouvelle_borne_max);
+
+double applatit_coordonnee (double valeur);
+
+double calc_coordonnee_positive (double xmin, double xmax, double x, double xmax_fenetre);
+
+coordonnes_t *calc_coordonnees (double xmin, double xmax, double ymin, 
+double ymax, double x, double y, double xmax_fenetre, double ymax_fenetre);
+
+
+
+#endif /* !CONVERT_COORDONNEES_H */
+
+
+
+# ./projet_final [rendu]/src/main.h
+
+#ifndef MAIN_H
+#define MAIN_H
+
+typedef struct coordonnees_affichage_s {
+	double xmin;
+	double xmax;
+	double ymin;
+	double ymax;
+	double x1;
+	double y1;
+} coordonnees_affichage_t;
+
+typedef struct color_rgb_s {
+	int red;
+	int green;
+	int blue;
+	char *forme;
+} color_rgb_t;
+
+typedef struct tab_dessin_s {
+	int *tx;
+	int *ty;
+	int taille_tx_ty;
+	color_rgb_t *color_rgb;
+} tab_dessin_t;
+
+tab_dessin_t **tab_affichage;
+int compteur_tab_affichage;
+
+// Affichage
+void affiche_filled_polygone (SDL_Renderer* renderer, int *tx, int *ty, int taille_tx_ty, color_rgb_t* color_rgb);
+void affiche_polygone (SDL_Renderer* renderer, int *tx, int *ty, int taille_tx_ty, color_rgb_t* color_rgb);
+void affiche_ligne (SDL_Renderer* renderer, int *tx, int *ty, int taille_tx_ty, color_rgb_t* color_rgb);
+void remplit_color_rgb_t (color_rgb_t *color_rgb, int red, int green, int blue, char *forme);
+int affichage (int taille_tab_dessin);
+color_rgb_t *utilise_tag (Way way);
+
+// XML
+void remplit_tab_dessin_t (tab_dessin_t *tab_dessin, int *tx, int *ty, int taille_tx_ty, color_rgb_t *color_rgb);
+int affiche_ways_debut (XML* xml, coordonnees_affichage_t *coordonnees_affichage);
+coordonnees_affichage_t *remplissage_des_coordoonnes_extremes (XML* xml);
+void affiche_ways_fin (SDL_Renderer* renderer, int taille_tab_dessin);
+void remlissage_hash_tab (ListNode *list_node);
+int lecture_du_XML (char *fichier_osm);
+Node *cherche_node_ref (char * ref);
+
+#endif /* !MAIN_H */
+
+
+# ./projet_final [rendu]/src/XML/Parser/liste.h
+
+#ifndef LISTE_H
+# define LISTE_H
+
+typedef struct liste_s {
+	double elt;
+	struct liste_s *next;
+} liste_t;
+
+#endif /* !LISTE_H */
+
+
+
+# ./projet_final [rendu]/src/XML/Parser/struct.h
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
+#ifndef STRUCT_H
+#define STRUCT_H
+
+typedef struct Node {
+	char   *id;
+	double lon;
+	double lat;
+} Node;
+
+typedef struct coord {
+	double lat;
+	double lon;
+} coord;
+
+typedef struct List {
+	char* data;
+	struct List* next;
+} List;
+
+typedef struct Way {
+	List* refs;
+	char* tag[2];
+} Way;
+
+typedef struct Bounds {
+	double minlat;
+	double minlon;
+	double maxlon;
+	double maxlat;
+} Bounds;
+
+typedef struct ListNode {
+	Node element;
+	struct ListNode* suivant;
+} ListNode;
+
+typedef struct ListWay {
+	Way element;
+	struct ListWay* suivant;
+} ListWay;
+
+typedef struct XML {
+	ListNode *ln;
+	int ListNode_len;
+	ListWay *lw;
+	Bounds *bd;
+} XML;
+
+XML* Parser(char* file);
+List *list_create (char* data);
+List *list_append(List *list, char* data);
+/* struct de liste specifique inutile*/
+ListNode *list_node_create (Node nd);
+ListNode* node_append(ListNode *list, Node element);
+ListWay *list_way_create (Way w);
+ListWay* way_append(ListWay *list, Way element);
+
+#endif /* !STRUCT_H */
+
+
